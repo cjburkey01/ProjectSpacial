@@ -9,13 +9,13 @@ public class HexHandler {
 
 	private Hex[,] grid;
 
-	public HexHandler(WorldHandler worldHandler, int width, int height) {
+	public HexHandler(WorldHandler worldHandler, int width, int height, float starChance, float starSize, Vector2Int planets) {
 		this.width = width;
 		this.height = height;
 		grid = new Hex[width, height];
 		for (int q = 0; q < width; q ++) {
 			for (int r = 0; r < height; r ++) {
-				grid[q, r] = new Hex(worldHandler, new OffsetHex(q, r));
+				grid[q, r] = new Hex(worldHandler, new OffsetHex(q, r), Random.Range(0.0f, 1.0f) < starChance, planets);
 			}
 		}
 	}
@@ -107,22 +107,27 @@ public class OffsetHex {
 		return FromPixel(hexSize, point.x, point.y).Equals(this);
 	}
 
-	public Vector2 GetRandomPoint(float hexSize) {
+	public bool GetRandomPoint(float hexSize, float padding, out Vector2 pos) {
 		Vector2 p = Vector2.zero;
 		int tries = 0;
+		pos = Vector2.zero;
+		if (padding >= hexSize) {
+			return false;
+		}
 		do {
 			Vector2 center = ToPixel(hexSize);
-			float h = HexHandler.SQRT3 * hexSize;
-			float x = Random.Range(center.x - hexSize, center.x + hexSize);
+			float h = HexHandler.SQRT3 * (hexSize - padding);
+			float x = Random.Range(center.x - hexSize + padding, center.x + hexSize - padding);
 			float y = Random.Range(center.y - h / 2, center.y + h / 2);
 			p = new Vector2(x, y);
 			tries ++;
-		} while(!ContainsPoint(hexSize, p) && tries < 1000);
+		} while(!ContainsPoint(hexSize - padding, p) && tries < 100);
 		if (tries >= 1000) {
 			Debug.LogError("Failed to find point for hex: " + ToString());
-			return Vector2.zero;
+			return false;
 		}
-		return p;
+		pos = p;
+		return true;
 	}
 
 	public override string ToString() {

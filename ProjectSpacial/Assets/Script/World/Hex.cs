@@ -4,15 +4,18 @@ public class Hex {
 
 	public readonly WorldHandler worldHandler;
 	public readonly OffsetHex position;
-	public readonly Vector2 starPos;
+	public readonly Star star;
 
-	public Hex(WorldHandler worldHandler, OffsetHex position) : this(worldHandler, position, position.GetRandomPoint(worldHandler.hexSize)) {
+	public bool HasStar {
+		get {
+			return !ReferenceEquals(star, null) && star.valid;
+		}
 	}
 
-	public Hex(WorldHandler worldHandler, OffsetHex position, Vector2 starPos) {
+	public Hex(WorldHandler worldHandler, OffsetHex position, bool spawnStar, Vector2Int planets) {
 		this.worldHandler = worldHandler;
 		this.position = position;
-		this.starPos = starPos;
+		star = (spawnStar) ? new Star("xyzzyx", this, Random.Range(planets.x, planets.y + 1)) : null;
 	}
 
 }

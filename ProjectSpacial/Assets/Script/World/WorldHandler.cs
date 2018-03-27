@@ -1,20 +1,20 @@
-﻿using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
-[RequireComponent(typeof(MeshFilter))]
-[RequireComponent(typeof(MeshRenderer))]
 public class WorldHandler : MonoBehaviour {
 
 	public static WorldHandler Main { private set; get; }
-	
-	public int width = 20;
-	public int height = 20;
-	public float hexSize = 1.0f;
 	public HexHandler HexHandler { private set; get; }
 
-	private MeshFilter meshFilter;
-	private MeshRenderer meshRenderer;
-	private Mesh mesh;
+	public HexChunk[,] chunks;
+	public GameObject chunkPrefab;
+	public int chunkSize = 16;  // 16*16 by 16*16 sized map
+	public int chunksX = 5;
+	public int chunksY = 5;
+	public float hexSize = 1.0f;
+	public float starSize = 0.1f;
+	public float starPadding = 0.3f;
+	public float starChance = 1.0f / 3.0f;
+	public Vector2Int minMaxPlanets;
 
 	public WorldHandler() {
 		Main = this;
@@ -22,46 +22,72 @@ public class WorldHandler : MonoBehaviour {
 
 	void Awake() {
 		if (ReferenceEquals(HexHandler, null)) {
-			HexHandler = new HexHandler(this, width, height);
+			HexHandler = new HexHandler(this, chunkSize * chunksX, chunkSize * chunksY, starChance, starSize, minMaxPlanets);
 		}
-		if (ReferenceEquals(meshFilter, null)) {
-			meshFilter = GetComponent<MeshFilter>();
-			if (ReferenceEquals(meshFilter, null)) {
-				Debug.LogError("Failed to locate MeshFilter on WorldHandler");
-			}
-		}
-		if (ReferenceEquals(meshRenderer, null)) {
-			meshRenderer = GetComponent<MeshRenderer>();
-			if (ReferenceEquals(meshRenderer, null)) {
-				Debug.LogError("Failed to locate MeshRenderer on WorldHandler");
-			}
-		}
-		if (ReferenceEquals(mesh, null)) {
-			mesh = new Mesh() {
-				name = "WorldHandlerMesh"
-			};
-			meshFilter.mesh = mesh;
-			meshFilter.sharedMesh = mesh;
-		}
+		GenerateMap();
 		RenderMap();
 	}
 
-	public void RenderMap() {
-		List<Vector3> verts = new List<Vector3>();
-		List<int> inds = new List<int>();
-		List<Vector2> uvs = new List<Vector2>();
-
-		for (int q = 0; q < width; q ++) {
-			for (int r = 0; r < height; r ++) {
-				HexRender.AddHex(verts, inds, uvs, hexSize, new OffsetHex(q, r));
-				Hex h = HexHandler.GetHex(q, r);
+	private void GenerateMap() {
+		if (chunkPrefab == null) {
+			Debug.LogError("ChunkPrefab is null for WorldHandler");
+			return;
+		}
+		foreach (Transform t in transform) {
+			Destroy(t.gameObject);
+		}
+		chunks = new HexChunk[chunksX, chunksY];
+		for (int x = 0; x < chunksX; x ++) {
+			for (int y = 0; y < chunksY; y ++) {
+				GameObject obj = Instantiate(chunkPrefab, Vector3.zero, Quaternion.identity);
+				HexChunk chunk = obj.GetComponent<HexChunk>();
+				if (ReferenceEquals(chunk, null)) {
+					Debug.LogError("HexChunk not found on ChunkPrefab");
+					return;
+				}
+				obj.transform.name = "Chunk (" + x + "x" + y + ")";
+				obj.transform.parent = transform;
+				chunk.chunkPos = new Vector2Int(x, y);
+				chunks[x, y] = chunk;
 			}
 		}
+	}
 
-		mesh.Clear();
-		mesh.SetVertices(verts);
-		mesh.SetIndices(inds.ToArray(), MeshTopology.Triangles, 0);
-		mesh.SetUVs(0, uvs);
+	public void RenderMap() {
+		foreach (Transform t in transform) {
+			HexChunk chunk = t.gameObject.GetComponent<HexChunk>();
+			if (ReferenceEquals(chunk, null)) {
+				Debug.LogError("HexChunk not found on chunk in world");
+				continue;
+			}
+			chunk.RenderChunk();
+		}
+	}
+
+	public void RenderContainingChunk(OffsetHex hex) {
+		int chunkX = Mathf.FloorToInt((float) hex.col / chunkSize);
+		int chunkY = Mathf.FloorToInt((float) hex.row / chunkSize);
+		if (chunkX < 0 || chunkX >= chunksX || chunkY < 0 || chunkY >= chunksY) {
+			Debug.LogError("Failed to render chunk: (" + chunkX + ", " + chunkY + "), it does not exist.");
+			return;
+		}
+		chunks[chunkX, chunkY].RenderChunk();
+	}
+
+	public int GetWidth() {
+		return chunkSize * chunksX;
+	}
+
+	public int GetHeight() {
+		return chunkSize * chunksY;
+	}
+
+	public int GetMaxX() {
+		return GetWidth() - 1;
+	}
+
+	public int GetMaxY() {
+		return GetHeight() - 1;
 	}
 
 }
